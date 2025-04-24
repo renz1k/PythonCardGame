@@ -1,21 +1,21 @@
+# game.py
 import random
-
 import pygame
-
+from settings import *
 from card import Card, select_player_cards, resolve_turn, apply_blur, draw_description
+from menu import pause_menu, final_screen
 from cards import ATTACK_CARDS
-from menu import final_screen, pause_menu
-from settings import WIDTH, HEIGHT, CARD_WIDTH, CARD_HEIGHT, FPS, TURN_TIME, MARGIN, BLACK, WHITE, NEON_BLUE, \
-    NEON_PURPLE, NEON_RED, load_font
 
-# Глобальные переменные для счета
 player_score = 5
 hacker_score = 5
 rounds = 0
 player_wins = 0
 hacker_wins = 0
 
-def game_screen():
+def game_screen(manager, screen):
+    # Очищаем элементы интерфейса перед началом игры
+    manager.clear_and_reset()
+
     global player_score, hacker_score, rounds, player_wins, hacker_wins
     player_score = 5
     hacker_score = 5
@@ -41,22 +41,23 @@ def game_screen():
 
     clock = pygame.time.Clock()
     running = True
+
     while running and rounds < 3:
+        time_delta = clock.tick(FPS) / 1000.0
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                return "exit"
+                return "exit", player_wins, hacker_wins
 
-            # Обработка нажатия ESC (пауза)
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
-                    result = pause_menu()
-
+                    result = pause_menu(manager, screen)
                     if result == "menu":
-                        return "menu"  # Выходим в главное меню
-
-                    elif isinstance(result, tuple) and result[0] == "resume":
-                        # Корректируем таймер, чтобы пауза не учитывалась
-                        last_turn_start += result[1]
+                        return "menu", player_wins, hacker_wins
+                    elif result == "resume":
+                        manager.clear_and_reset()  # Очищаем элементы паузы
+                        last_turn_start = pygame.time.get_ticks()
+                    elif result == "exit":
+                        return "exit", player_wins, hacker_wins
 
             if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
                 mouse_pos = pygame.mouse.get_pos()
@@ -89,6 +90,8 @@ def game_screen():
                         hacker_card.highlighted = True
                         target_blur_alpha = 200
                         target_description_alpha = 255
+
+            manager.process_events(event)
 
         if hacker_card is None and player_score > 0 and hacker_score > 0:
             available_hacker_cards = [card for card in hacker_deck if card not in hacker_deck_used]
@@ -123,27 +126,39 @@ def game_screen():
         for card in player_cards:
             card.update_rotation()
 
-        screen = pygame.display.get_surface()
-        screen.fill(BLACK)
-        # Рисуем фоновые линии (для стилизации)
-        for i in range(0, WIDTH, 50):
-            pygame.draw.line(screen, NEON_PURPLE, (i, 0), (i, HEIGHT), 1)
-        for i in range(0, HEIGHT, 50):
-            pygame.draw.line(screen, NEON_BLUE, (0, i), (WIDTH, i), 1)
+        screen.blit(BACKGROUNDS["game"], (0, 0))  # Отображаем фоновое изображение
 
         font = load_font(36)
-        player_text = font.render(f"Игрок: {player_score}", True, NEON_BLUE)
-        hacker_text = font.render(f"Хакер: {hacker_score}", True, NEON_PURPLE)
+        # Отрисовка раунда по центру сверху с отступом
         round_text = font.render(f"Раунд: {rounds + 1}", True, WHITE)
-        remaining_hacker_cards = len(hacker_deck) - len(hacker_deck_used)
-        hacker_cards_text = font.render(f"Карт хакера: {remaining_hacker_cards}", True, NEON_PURPLE)
-        timer_text = font.render(f"Время: {int(turn_timer)}", True, NEON_RED)
+        screen.blit(round_text, (WIDTH // 2 - round_text.get_width() // 2, 10))
 
+        # Отрисовка счета игрока с тенью
+        player_text = font.render(f"Игрок: {player_score}", True, NEON_BLUE)
+        player_shadow = font.render(f"Игрок: {player_score}", True, (0, 100, 150))
+        screen.blit(player_shadow, (MARGIN + 2, MARGIN + 2))
         screen.blit(player_text, (MARGIN, MARGIN))
+
+        # Отрисовка счета хакера с тенью
+        hacker_text = font.render(f"Хакер: {hacker_score}", True, NEON_RED)
+        hacker_shadow = font.render(f"Хакер: {hacker_score}", True, (100, 0, 0))
+        screen.blit(hacker_shadow, (WIDTH - hacker_text.get_width() - MARGIN + 2, MARGIN + 2))
         screen.blit(hacker_text, (WIDTH - hacker_text.get_width() - MARGIN, MARGIN))
-        screen.blit(round_text, (WIDTH // 2 - round_text.get_width() // 2, MARGIN))
-        screen.blit(hacker_cards_text, (WIDTH - hacker_cards_text.get_width() - MARGIN, MARGIN + 40))
-        screen.blit(timer_text, (MARGIN, MARGIN + 40))
+
+        # Отрисовка оставшихся карт хакера с тенью
+        remaining_hacker_cards = len(hacker_deck) - len(hacker_deck_used)
+        hacker_cards_text = font.render(f"Карт хакера: {remaining_hacker_cards}", True, NEON_RED)
+        hacker_cards_shadow = font.render(f"Карт хакера: {remaining_hacker_cards}", True, (100, 0, 0))
+        screen.blit(hacker_cards_shadow, (WIDTH - hacker_cards_text.get_width() - MARGIN + 2, MARGIN + 45))
+        screen.blit(hacker_cards_text, (WIDTH - hacker_cards_text.get_width() - MARGIN, MARGIN + 45))
+
+        # Отрисовка таймера с тенью и анимацией при малом времени
+        timer_color = NEON_ORANGE if turn_timer <= 10 else NEON_CYAN
+        timer_shadow_color = (100, 50, 0) if turn_timer <= 10 else (0, 100, 100)
+        timer_text = font.render(f"Время: {int(turn_timer)}", True, timer_color)
+        timer_shadow = font.render(f"Время: {int(turn_timer)}", True, timer_shadow_color)
+        screen.blit(timer_shadow, (MARGIN + 2, MARGIN + 45))
+        screen.blit(timer_text, (MARGIN, MARGIN + 45))
 
         if hacker_card:
             hacker_card.draw(screen)
@@ -188,8 +203,9 @@ def game_screen():
             pygame.time.wait(1000)
 
         if player_wins >= 2 or hacker_wins >= 2:
-            return final_screen(player_wins, hacker_wins)
+            return "final", player_wins, hacker_wins
 
+        manager.update(time_delta)
+        manager.draw_ui(screen)
         pygame.display.flip()
-        clock.tick(FPS)
-    return "menu"
+    return "menu", player_wins, hacker_wins
