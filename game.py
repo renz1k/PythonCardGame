@@ -29,6 +29,8 @@ def game_screen(manager, screen):
     target_description_alpha = 0
     turn_timer = TURN_TIME
     last_turn_start = pygame.time.get_ticks()
+    pause_start_time = 0  # Добавляем переменную для хранения времени начала паузы
+    total_pause_time = 0  # Добавляем переменную для хранения общего времени паузы
 
     hacker_deck = random.sample(ATTACK_CARDS, 10)
     hacker_deck_used = []
@@ -50,12 +52,13 @@ def game_screen(manager, screen):
 
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_ESCAPE:
+                    pause_start_time = pygame.time.get_ticks()  # Запоминаем время начала паузы
                     result = pause_menu(manager, screen)
                     if result == "menu":
                         return "menu", player_wins, hacker_wins
                     elif result == "resume":
                         manager.clear_and_reset()  # Очищаем элементы паузы
-                        last_turn_start = pygame.time.get_ticks()
+                        total_pause_time += pygame.time.get_ticks() - pause_start_time  # Добавляем время паузы
                     elif result == "exit":
                         return "exit", player_wins, hacker_wins
 
@@ -103,7 +106,7 @@ def game_screen(manager, screen):
 
         if hacker_card:
             current_time = pygame.time.get_ticks()
-            elapsed_time = (current_time - last_turn_start) / 1000
+            elapsed_time = (current_time - last_turn_start - total_pause_time) / 1000  # Учитываем время паузы
             turn_timer = max(0, TURN_TIME - elapsed_time)
             if turn_timer <= 0:
                 player_score -= 2
@@ -112,6 +115,7 @@ def game_screen(manager, screen):
                 hacker_card = None
                 turn_timer = TURN_TIME
                 last_turn_start = pygame.time.get_ticks()
+                total_pause_time = 0  # Сбрасываем время паузы при новом ходе
                 if description_card:
                     description_card.highlighted = False
                     description_card = None
