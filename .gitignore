@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+ENV/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build files
+build/
+dist/
+*.spec
+*.exe
+installer/
+
+# Generated files
+*.ico
+*.pyc
+*.pyo
+*.pyd
+
+# Project specific
+create_icon.py
+build_installer.py
+build.py
+setup.iss
+test_coverage_stats.py
+
+# Keep only essential files
+!requirements.txt
+!README.md
+!architecture.md
+!theme.json
+!*.py
+!*.svg
+!*.mp3
+!*.ttf
+!*.txt 
